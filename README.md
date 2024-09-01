@@ -7,7 +7,7 @@ There might be some bugs in the code. Please have mercy with me.
 
 I tested it in my game and it worked normally.
 
-I only edited [PhotonVRManager]([(https://github.com/TMTimeVR/PhotonVR/blob/main/PhotonVRManager.cs)]) so just copy and paste this into your PhotonVRManager.
+I only edited [PhotonVRManager]([(https://github.com/TMTimeVR/PhotonVR/blob/main/PhotonVRManager.cs)](https://github.com/TMTimeVR/PhotonVR/blob/main/PhotonVRManager.cs)) so just copy and paste this into your PhotonVRManager.
 
 
 # I DID NOT MAKE THIS. I JUST MODIFIED THE CODE! 
