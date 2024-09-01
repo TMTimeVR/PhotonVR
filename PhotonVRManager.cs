@@ -6,12 +6,13 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 using Photon.VR.Player;
+using Photon.VR.Cosmetics;
 using Photon.Pun;
 using Photon.Realtime;
 using Photon.Voice;
+using Photon;
 
 using ExitGames.Client.Photon;
-using Photon.VR.Saving;
 
 namespace Photon.VR
 {
@@ -24,24 +25,28 @@ namespace Photon.VR
         public string VoiceAppId;
         [Tooltip("Please read https://doc.photonengine.com/en-us/pun/current/connection-and-authentication/regions for more information")]
         public string Region = "eu";
+        [Tooltip("The region that people connect to if the apk is a development build (check your build settings).")]
+        public string DevRegion = "";
 
         [Header("Player")]
         public Transform Head;
         public Transform LeftHand;
         public Transform RightHand;
         public Color Colour;
-        public Dictionary<string, string> Cosmetics { get; private set; } = new Dictionary<string, string>();
+        public PhotonVRCosmeticsData Cosmetics { get; private set; } = new PhotonVRCosmeticsData();
 
         [Header("Networking")]
         public string DefaultQueue = "Default";
-        public int DefaultRoomLimit = 16;
+        public int DefaultRoomLimit = 10;
 
         [Header("Other")]
-        // This shuold always be true
+        // This should always be true
         [Tooltip("If the user shall connect when this object has awoken")]
         public bool ConnectOnAwake = true;
         [Tooltip("If the user shall join a room when they connect")]
         public bool JoinRoomOnConnect = true;
+        [Tooltip("Simulates an online connection.\nPUN can be used as usual.")]
+        public bool StartInOfflineMode = false;
 
         [NonSerialized]
         public PhotonVRPlayer LocalPlayer;
@@ -53,10 +58,23 @@ namespace Photon.VR
         private void Start()
         {
             if (Manager == null)
+            {
                 Manager = this;
+                Manager.State = ConnectionState.Setting_Up_Settings;
+                PhotonNetwork.PhotonServerSettings.DevRegion = DevRegion;
+            }
+            else if (StartInOfflineMode == true)
+            {
+                PhotonNetwork.PhotonServerSettings.StartInOfflineMode = true;
+            }
+            else if (StartInOfflineMode == false)
+            {
+                PhotonNetwork.PhotonServerSettings.StartInOfflineMode = false;
+            }
             else
             {
                 Debug.LogError("There can't be multiple PhotonVRManagers in a scene");
+                Manager.State = ConnectionState.Error;
                 Application.Quit();
             }
 
@@ -68,74 +86,9 @@ namespace Photon.VR
             if (!string.IsNullOrEmpty(PlayerPrefs.GetString("Colour")))
                 Colour = JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Colour"));
             if (!string.IsNullOrEmpty(PlayerPrefs.GetString("Cosmetics")))
-                Cosmetics = PhotonVRValueSaver.GetDictionary("Cosmetics");
+                Cosmetics = JsonUtility.FromJson<PhotonVRCosmeticsData>(PlayerPrefs.GetString("Cosmetics"));
 
         }
-
-#if UNITY_EDITOR
-        public void CheckDefaultValues()
-        {
-            bool b = CheckForRig(this);
-            if (b)
-            {
-                if (string.IsNullOrEmpty(AppId))
-                    AppId = PhotonNetwork.PhotonServerSettings.AppSettings.AppIdFusion;
-
-                if (string.IsNullOrEmpty(VoiceAppId))
-                    VoiceAppId = PhotonNetwork.PhotonServerSettings.AppSettings.AppIdVoice;
-
-                Debug.Log("Attempted to set default values");
-            }
-        }
-
-        private bool CheckForRig(PhotonVRManager manager)
-        {
-            GameObject[] objects = FindObjectsOfType<GameObject>();
-
-            bool b = false;
-
-            if (manager.Head == null)
-            {
-                b = true;
-                foreach (GameObject obj in objects)
-                {
-                    if (obj.name.Contains("Camera") || obj.name.Contains("Head"))
-                    {
-                        manager.Head = obj.transform;
-                        break;
-                    }
-                }
-            }
-
-            if (manager.LeftHand == null)
-            {
-                b = true;
-                foreach (GameObject obj in objects)
-                {
-                    if (obj.name.Contains("Left") && (obj.name.Contains("Hand") || obj.name.Contains("Controller")))
-                    {
-                        manager.LeftHand = obj.transform;
-                        break;
-                    }
-                }
-            }
-
-            if (manager.RightHand == null)
-            {
-                b = true;
-                foreach (GameObject obj in objects)
-                {
-                    if (obj.name.Contains("Right") && (obj.name.Contains("Hand") || obj.name.Contains("Controller")))
-                    {
-                        manager.RightHand = obj.transform;
-                        break;
-                    }
-                }
-            }
-
-            return b;
-        }
-#endif
 
         /// <summary>
         /// Connects to Photon using the specified AppId and VoiceAppId
@@ -145,6 +98,7 @@ namespace Photon.VR
             if (string.IsNullOrEmpty(Manager.AppId) || string.IsNullOrEmpty(Manager.VoiceAppId))
             {
                 Debug.LogError("Please input an app id");
+                Manager.State = ConnectionState.Error;
                 return false;
             }
 
@@ -155,7 +109,7 @@ namespace Photon.VR
             PhotonNetwork.PhotonServerSettings.AppSettings.AppIdVoice = Manager.VoiceAppId;
             PhotonNetwork.PhotonServerSettings.AppSettings.FixedRegion = Manager.Region;
             PhotonNetwork.ConnectUsingSettings();
-            Debug.Log($"Connecting - AppId: {PhotonNetwork.PhotonServerSettings.AppSettings.AppIdRealtime} VoiceAppId: {PhotonNetwork.PhotonServerSettings.AppSettings.AppIdVoice}");
+            Debug.Log($"Connecting");
             return true;
         }
 
@@ -167,6 +121,7 @@ namespace Photon.VR
             if (string.IsNullOrEmpty(Manager.AppId) || string.IsNullOrEmpty(Manager.VoiceAppId))
             {
                 Debug.LogError("Please input an app id");
+                Manager.State = ConnectionState.Error;
                 return false;
             }
 
@@ -181,7 +136,7 @@ namespace Photon.VR
             PhotonNetwork.PhotonServerSettings.AppSettings.AppIdVoice = Manager.VoiceAppId;
             PhotonNetwork.PhotonServerSettings.AppSettings.FixedRegion = Manager.Region;
             PhotonNetwork.ConnectUsingSettings();
-            Debug.Log($"Connecting - AppId: {PhotonNetwork.PhotonServerSettings.AppSettings.AppIdRealtime} VoiceAppId: {PhotonNetwork.PhotonServerSettings.AppSettings.AppIdVoice}");
+            Debug.Log($"Connecting");
             return true;
         }
 
@@ -254,13 +209,13 @@ namespace Photon.VR
         /// Sets the cosmetics
         /// </summary>
         /// <param name="PlayerCosmetics">The cosmetics you want to set</param>
-        public static void SetCosmetics(Dictionary<string, string> PlayerCosmetics)
+        public static void SetCosmetics(PhotonVRCosmeticsData PlayerCosmetics)
         {
             Manager.Cosmetics = PlayerCosmetics;
             ExitGames.Client.Photon.Hashtable hash = PhotonNetwork.LocalPlayer.CustomProperties;
-            hash["Cosmetics"] = Manager.Cosmetics;
+            hash["Cosmetics"] = JsonUtility.ToJson(PlayerCosmetics);
             PhotonNetwork.LocalPlayer.SetCustomProperties(hash);
-            PhotonVRValueSaver.SaveDictionary("Cosmetics", Manager.Cosmetics);
+            PlayerPrefs.SetString("Cosmetics", JsonUtility.ToJson(PlayerCosmetics));
 
             if (PhotonNetwork.InRoom)
                 if (Manager.LocalPlayer != null)
@@ -271,13 +226,36 @@ namespace Photon.VR
         /// Sets a specefic cosmetic
         /// </summary>
         /// <param name="Type">The type of cosmetic you want to set</param>
-        public static void SetCosmetic(string Type, string CosmeticId)
+        public static void SetCosmetic(CosmeticType Type, string CosmeticId)
         {
-            Manager.Cosmetics[Type] = CosmeticId;
+            PhotonVRCosmeticsData Cosmetics = Manager.Cosmetics;
+            switch (Type)
+            {
+                case CosmeticType.Head:
+                    Cosmetics.Head = CosmeticId;
+                    break;
+                case CosmeticType.Face:
+                    Cosmetics.Face = CosmeticId;
+                    break;
+                case CosmeticType.Body:
+                    Cosmetics.Body = CosmeticId;
+                    break;
+                case CosmeticType.BothHands:
+                    Cosmetics.LeftHand = CosmeticId;
+                    Cosmetics.RightHand = CosmeticId;
+                    break;
+                case CosmeticType.LeftHand:
+                    Cosmetics.LeftHand = CosmeticId;
+                    break;
+                case CosmeticType.RightHand:
+                    Cosmetics.RightHand = CosmeticId;
+                    break;
+            }
+            Manager.Cosmetics = Cosmetics;
             ExitGames.Client.Photon.Hashtable hash = PhotonNetwork.LocalPlayer.CustomProperties;
-            hash["Cosmetics"] = Manager.Cosmetics;
+            hash["Cosmetics"] = JsonUtility.ToJson(Cosmetics);
             PhotonNetwork.LocalPlayer.SetCustomProperties(hash);
-            PhotonVRValueSaver.SaveDictionary("Cosmetics", Manager.Cosmetics);
+            PlayerPrefs.SetString("Cosmetics", JsonUtility.ToJson(Cosmetics));
 
             if (PhotonNetwork.InRoom)
                 if (Manager.LocalPlayer != null)
@@ -291,7 +269,7 @@ namespace Photon.VR
 
             PhotonNetwork.LocalPlayer.NickName = PlayerPrefs.GetString("Username");
             PhotonNetwork.LocalPlayer.CustomProperties["Colour"] = JsonUtility.ToJson(Colour);
-            PhotonNetwork.LocalPlayer.CustomProperties["Cosmetics"] = Cosmetics;
+            PhotonNetwork.LocalPlayer.CustomProperties["Cosmetics"] = JsonUtility.ToJson(Cosmetics);
 
             if (JoinRoomOnConnect)
                 JoinRandomRoom(DefaultQueue, DefaultRoomLimit);
@@ -313,9 +291,13 @@ namespace Photon.VR
         /// <param name="MaxPlayers"></param>
         public static void SwitchScenes(int SceneIndex, int MaxPlayers)
         {
+            Manager.State = ConnectionState.Switching_Scenes;
             SceneManager.LoadScene(SceneIndex);
             JoinRandomRoom(SceneIndex.ToString(), MaxPlayers);
         }
+
+        //Isn't this the same?
+        //Or do I just suck at coding fchb?
 
         /// <summary>
         /// Switches scenes and joins a new room
@@ -323,6 +305,7 @@ namespace Photon.VR
         /// <param name="SceneIndex"></param>
         public static void SwitchScenes(int SceneIndex)
         {
+            Manager.State = ConnectionState.Switching_Scenes;
             SceneManager.LoadScene(SceneIndex);
             JoinRandomRoom(SceneIndex.ToString(), Manager.DefaultRoomLimit);
         }
@@ -379,6 +362,7 @@ namespace Photon.VR
                 MaxPlayers = (byte)MaxPlayers
             }, null, null);
             Debug.Log($"Joining a private room: {RoomId}");
+            Manager.State = ConnectionState.JoiningRoom;
         }
 
         public override void OnJoinedRoom()
@@ -399,6 +383,7 @@ namespace Photon.VR
         private void HandleJoinError()
         {
             Debug.Log("Failed to join room - creating a new one");
+            Manager.State = ConnectionState.Error;
 
             string roomCode = CreateRoomCode();
             Debug.Log($"Joining {roomCode}");
@@ -412,6 +397,7 @@ namespace Photon.VR
         public string CreateRoomCode()
         {
             return new System.Random().Next(99999).ToString();
+            Manager.State = ConnectionState.Generating_Roomcode;
         }
     }
 
@@ -421,6 +407,10 @@ namespace Photon.VR
         Connecting,
         Connected,
         JoiningRoom,
-        InRoom
+        InRoom,
+        Error,
+        Generating_Roomcode,
+        Switching_Scenes,
+        Setting_Up_Settings
     }
 }
