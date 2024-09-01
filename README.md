@@ -3,6 +3,32 @@ A Unity Package containing all the necessary components to do VR networking with
 
 # I DID NOT MAKE THIS. I JUST MODIFIED THE CODE! 
 
+I added a dev region choice. Meaning if your apk is a development build, it's going to connect to the dev region.
+```cs
+        [Tooltip("The region that people connect to if the apk is a development build (check your build settings).")]
+        public string DevRegion = "";
+```
+I also added a Offline mode bool. Meaning that it simulates an online connection. PUN can be used as if it was in an online connection.
+```cs
+        [Tooltip("Simulates an online connection.\nPUN can be used as usual.")]
+        public bool StartInOfflineMode = false;
+```
+I also also added more connection states for more debugging.
+```cs
+    public enum ConnectionState
+    {
+        Disconnected,
+        Connecting,
+        Connected,
+        JoiningRoom,
+        InRoom,
+        Error,
+        Generating_Roomcode,
+        Switching_Scenes,
+        Setting_Up_Settings
+    }
+```
+
 # Credits to [fchb1239]([https://github.com/fchb1239/PhotonVR/releases](https://github.com/fchb1239/PhotonVR)) for making Photon VR.
 
 [![Download](https://img.shields.io/badge/Download-blue.svg)](https://github.com/fchb1239/PhotonVR/releases)
