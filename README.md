@@ -1,6 +1,15 @@
 # ![](Visuals/SmallerText.png)
 A Unity Package containing all the necessary components to do VR networking with [Photon](https://photonengine.com)
 
+# Disclaimer
+
+There might be some bugs in the code. Please have mercy with me.
+
+I tested it in my game and it worked normally.
+
+I only edited [PhotonVRManager]((https://github.com/TMTimeVR/PhotonVR/blob/main/PhotonVRManager.cs)) so just copy and paste this into your PhotonVRManager.
+
+
 # I DID NOT MAKE THIS. I JUST MODIFIED THE CODE! 
 
 I added a dev region choice. Meaning if your apk is a development build, it's going to connect to the dev region.
@@ -28,6 +37,8 @@ I also also added more connection states for more debugging.
         Setting_Up_Settings
     }
 ```
+
+I just basically made it more easy so you don't have to go manually into the Photon server settings and just be able to control Photon from one script.
 
 # Credits to [fchb1239]([https://github.com/fchb1239/PhotonVR/releases](https://github.com/fchb1239/PhotonVR)) for making Photon VR.
 
