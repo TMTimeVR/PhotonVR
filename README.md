@@ -1,6 +1,10 @@
 # ![](Visuals/SmallerText.png)
 A Unity Package containing all the necessary components to do VR networking with [Photon](https://photonengine.com)
 
+# I DID NOT MAKE THIS. I JUST MODIFIED THE CODE! 
+
+# Credits to [![fchb1239]([https://github.com/fchb1239/PhotonVR/releases](https://github.com/fchb1239/PhotonVR)) for making Photon VR.
+
 [![Download](https://img.shields.io/badge/Download-blue.svg)](https://github.com/fchb1239/PhotonVR/releases)
 [![Discord](https://img.shields.io/badge/Discord-blue.svg)](https://discord.gg/rRvnU846Bf)
 
