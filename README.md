@@ -38,6 +38,36 @@ I also also added more connection states for more debugging.
     }
 ```
 
+I also also ALSO added a TMP that you can assign and it will say what's going on.
+```cs
+        [Tooltip("Basically a tmp that says what PhotonVRManager is doing.")]
+        public static TextMeshPro LogText;
+```
+```cs
+            if (Manager == null)
+            {
+                Manager = this;
+                Manager.State = ConnectionState.Setting_Up_Settings;
+                LogText.text = "Setting Up Settings..."; //Here
+                PhotonNetwork.PhotonServerSettings.DevRegion = DevRegion;
+            }
+            else if (StartInOfflineMode == true)
+            {
+                PhotonNetwork.PhotonServerSettings.StartInOfflineMode = true;
+            }
+            else if (StartInOfflineMode == false)
+            {
+                PhotonNetwork.PhotonServerSettings.StartInOfflineMode = false;
+            }
+            else
+            {
+                Debug.LogError("There can't be multiple PhotonVRManagers in a scene");
+                Manager.State = ConnectionState.Error;
+                LogText.text = "ERROR: There can't be multiple PhotonVRManagers in a scene."; //Also here
+                Application.Quit();
+            }
+```
+
 I just basically made it more easy so you don't have to go manually into the Photon server settings and just be able to control Photon from one script.
 
 # Credits to [fchb1239]([https://github.com/fchb1239/PhotonVR/releases](https://github.com/fchb1239/PhotonVR)) for making Photon VR.
