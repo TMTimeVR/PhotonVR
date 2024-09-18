@@ -12,6 +12,8 @@ using Photon.Realtime;
 using Photon.Voice;
 using Photon;
 
+using TMPro;
+
 using ExitGames.Client.Photon;
 
 namespace Photon.VR
@@ -48,6 +50,9 @@ namespace Photon.VR
         [Tooltip("Simulates an online connection.\nPUN can be used as usual.")]
         public bool StartInOfflineMode = false;
 
+        [Tooltip("Basically a tmp that says what PhotonVRManager is doing.")]
+        public static TextMeshPro LogText;
+
         [NonSerialized]
         public PhotonVRPlayer LocalPlayer;
 
@@ -61,6 +66,7 @@ namespace Photon.VR
             {
                 Manager = this;
                 Manager.State = ConnectionState.Setting_Up_Settings;
+                LogText.text = "Setting Up Settings...";
                 PhotonNetwork.PhotonServerSettings.DevRegion = DevRegion;
             }
             else if (StartInOfflineMode == true)
@@ -75,6 +81,7 @@ namespace Photon.VR
             {
                 Debug.LogError("There can't be multiple PhotonVRManagers in a scene");
                 Manager.State = ConnectionState.Error;
+                LogText.text = "ERROR: There can't be multiple PhotonVRManagers in a scene.";
                 Application.Quit();
             }
 
@@ -99,6 +106,7 @@ namespace Photon.VR
             {
                 Debug.LogError("Please input an app id");
                 Manager.State = ConnectionState.Error;
+                LogText.text = "Please input an app id.";
                 return false;
             }
 
@@ -110,6 +118,7 @@ namespace Photon.VR
             PhotonNetwork.PhotonServerSettings.AppSettings.FixedRegion = Manager.Region;
             PhotonNetwork.ConnectUsingSettings();
             Debug.Log($"Connecting");
+            LogText.text = "Connecting...";
             return true;
         }
 
@@ -122,6 +131,7 @@ namespace Photon.VR
             {
                 Debug.LogError("Please input an app id");
                 Manager.State = ConnectionState.Error;
+                LogText.text = "Please input an app id.";
                 return false;
             }
 
@@ -137,6 +147,7 @@ namespace Photon.VR
             PhotonNetwork.PhotonServerSettings.AppSettings.FixedRegion = Manager.Region;
             PhotonNetwork.ConnectUsingSettings();
             Debug.Log($"Connecting");
+            LogText.text = "Connecting...";
             return true;
         }
 
@@ -266,6 +277,7 @@ namespace Photon.VR
         {
             State = ConnectionState.Connected;
             Debug.Log("Connected");
+            LogText.text = "Connected!";
 
             PhotonNetwork.LocalPlayer.NickName = PlayerPrefs.GetString("Username");
             PhotonNetwork.LocalPlayer.CustomProperties["Colour"] = JsonUtility.ToJson(Colour);
@@ -362,6 +374,7 @@ namespace Photon.VR
                 MaxPlayers = (byte)MaxPlayers
             }, null, null);
             Debug.Log($"Joining a private room: {RoomId}");
+            LogText.text = $"Joining a private room: {RoomId}";
             Manager.State = ConnectionState.JoiningRoom;
         }
 
@@ -376,6 +389,7 @@ namespace Photon.VR
             base.OnDisconnected(cause);
             State = ConnectionState.Disconnected;
             Debug.Log("Disconnected from server");
+            LogText.text = $"Disconnected. Cause {cause}";
         }
 
         public override void OnJoinRandomFailed(short returnCode, string message) => HandleJoinError();
@@ -384,9 +398,11 @@ namespace Photon.VR
         {
             Debug.Log("Failed to join room - creating a new one");
             Manager.State = ConnectionState.Error;
+            LogText.text = "Failed to join room - creating a new one.";
 
             string roomCode = CreateRoomCode();
             Debug.Log($"Joining {roomCode}");
+            LogText.text = $"Joining {roomCode}";
             PhotonNetwork.CreateRoom(roomCode, options, null, null);
         }
 
