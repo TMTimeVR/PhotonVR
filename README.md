@@ -1,4 +1,4 @@
-# ![](Visuals/SmallerTextepic.png)
+# ![](Visuals/SmallerTextepicepic.png)
 A Unity Package containing all the necessary components to do VR networking with [Photon](https://photonengine.com)
 
 # Disclaimer
