@@ -309,7 +309,6 @@ namespace Photon.VR
         }
 
         //Isn't this the same?
-        //Or do I just suck at coding fchb?
 
         /// <summary>
         /// Switches scenes and joins a new room
