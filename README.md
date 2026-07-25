@@ -2,7 +2,9 @@
 A Unity Package containing all the necessary components to do VR networking with [Photon](https://photonengine.com).
 And more customisation.
 
-# Disclaimer
+# Notes by TMTime
+
+This fork is to basically be a Photon VR 0.06. It is meant to improve security. Security updates are coming soon.
 
 There might be some bugs in the code. Please have mercy with me.
 
