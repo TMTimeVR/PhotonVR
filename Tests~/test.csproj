@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Compiles the package's real source files against the stand-ins in
+       Stubs.cs. Nothing is copied, so these tests always run against what is
+       actually committed. Testing/*.cs and *GUI.cs are editor-only and excluded. -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>PhotonVRTests</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>TESTPASS</DefineConstants>
+    <NoWarn>CS0168;CS0169;CS0414;CS0649;CS0219;CS0067;CS0108;CS0114</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Stubs.cs" />
+    <Compile Include="..\PhotonVRManager.cs" />
+    <Compile Include="..\Player\**\*.cs" />
+    <Compile Include="..\Saving\**\*.cs" />
+    <Compile Include="TestMain.cs" />
+  </ItemGroup>
+
+</Project>

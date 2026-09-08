@@ -1,19 +1,24 @@
 # ![](Visuals/SmallerTextepicepic.png)
-A Unity Package containing all the necessary components to do VR networking with [Photon](https://photonengine.com).
-And more customisation.
+A Unity Package containing all the necessary components to do VR networking with [Photon](https://photonengine.com), plus more customisation.
 
 # Notes by TMTime
 
-This fork is to basically be a Photon VR 0.0.6. It is meant to improve security. Security updates are coming soon.
+This fork is basically Photon VR 0.0.6.
 
 There might be some bugs in the code. Please have mercy with me.
 
-I tested it in my game and it worked normally.
+**Do not copy just PhotonVRManager.cs any more.** It used to be the only file I had
+changed. The September 2026 review changed seven, and the manager now depends on the
+others. Take the whole package.
 
-I only edited [PhotonVRManager](https://github.com/TMTimeVR/PhotonVR/blob/main/PhotonVRManager.cs) so just copy and paste this into your PhotonVRManager.
+The short version of that review. This fork did not compile, and the manager never
+finished starting up, because of a null reference four lines into `Start()`. Both are
+fixed. So are two bugs that let any player in a room crash everyone else, and room
+codes that collided often enough to leave people stuck. Full write-up in
+[reports/security-review.md](reports/security-review.md), tests in [Tests~](Tests~).
 
 
-# I DID NOT MAKE THIS. I JUST MODIFIED THE CODE! 
+# I DID NOT MAKE THIS. I JUST MODIFIED THE CODE!
 
 I added a dev region choice. Meaning if your apk is a development build, it's going to connect to the dev region.
 ```cs
@@ -25,6 +30,9 @@ I also added a Offline mode bool. Meaning that it simulates an online connection
         [Tooltip("Simulates an online connection.\nPUN can be used as usual.")]
         public bool StartInOfflineMode = false;
 ```
+This did nothing before the September 2026 review. The code set it inside a branch
+that only a *duplicate* manager could reach, so the real manager never read it.
+`Start()` applies it now.
 I also also added more connection states for more debugging.
 ```cs
     public enum ConnectionState
@@ -43,37 +51,27 @@ I also also added more connection states for more debugging.
 
 I also also ALSO added a TMP that you can assign and it will say what's going on.
 ```cs
-        [Tooltip("Basically a tmp that says what PhotonVRManager is doing.")]
-        public static TextMeshPro LogText;
+        [Tooltip("Optional. A TextMeshPro that displays what PhotonVRManager is doing.")]
+        public TextMeshPro LogText;
 ```
+Assign it in the Inspector, or leave it empty and the status only goes to the log.
+
+It was `public static` until the September 2026 review. Unity does not serialize
+static fields, so the Inspector could never assign it and it was null in every build.
+`Start()` then wrote to it before doing anything else. That one line stopped the
+manager connecting at all. Writes go through a helper that tolerates it being unset:
 ```cs
-            if (Manager == null)
-            {
-                Manager = this;
-                Manager.State = ConnectionState.Setting_Up_Settings;
-                LogText.text = "Setting Up Settings..."; //Here
-                PhotonNetwork.PhotonServerSettings.DevRegion = DevRegion;
-            }
-            else if (StartInOfflineMode == true)
-            {
-                PhotonNetwork.PhotonServerSettings.StartInOfflineMode = true;
-            }
-            else if (StartInOfflineMode == false)
-            {
-                PhotonNetwork.PhotonServerSettings.StartInOfflineMode = false;
-            }
-            else
-            {
-                Debug.LogError("There can't be multiple PhotonVRManagers in a scene");
-                Manager.State = ConnectionState.Error;
-                LogText.text = "ERROR: There can't be multiple PhotonVRManagers in a scene."; //Also here
-                Application.Quit();
-            }
+        private static void Status(string message)
+        {
+            Debug.Log(message);
+            if (Manager != null && Manager.LogText != null)
+                Manager.LogText.text = message;
+        }
 ```
 
 I just basically made it more easy so you don't have to go manually into the Photon server settings and just be able to control Photon from one script.
 
-# Credits to [fchb1239]([https://github.com/fchb1239/PhotonVR/releases](https://github.com/fchb1239/PhotonVR)) for making Photon VR.
+# Credits to [fchb1239](https://github.com/fchb1239/PhotonVR) for making Photon VR.
 
 [![Download](https://img.shields.io/badge/Download-blue.svg)](https://github.com/fchb1239/PhotonVR/releases)
 [![Discord](https://img.shields.io/badge/Discord-blue.svg)](https://discord.gg/rRvnU846Bf)

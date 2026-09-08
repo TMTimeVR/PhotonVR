@@ -14,12 +14,17 @@ namespace Photon.VR.Player
 
         public override void OnJoinedRoom()
         {
+
+            if (playerTemp != null)
+                PhotonNetwork.Destroy(playerTemp);
+
             playerTemp = PhotonNetwork.Instantiate(PrefabLocation, Vector3.zero, Quaternion.identity);
         }
 
         public override void OnLeftRoom()
         {
-            PhotonNetwork.Destroy(playerTemp);
+
+            playerTemp = null;
         }
     }
 
