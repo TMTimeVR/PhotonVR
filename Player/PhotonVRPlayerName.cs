@@ -15,10 +15,19 @@ namespace Photon.VR.Player
 
         private void Update()
         {
+
+            if (Head == null || PhotonVRManager.Manager == null || PhotonVRManager.Manager.Head == null)
+                return;
+
             transform.position = Head.position + new Vector3(0, Offset, 0);
 
             Vector3 direction = PhotonVRManager.Manager.Head.position - transform.position;
-            Quaternion quaternion = new Quaternion(0, Quaternion.LookRotation(direction).y, 0, Quaternion.LookRotation(direction).w);
+
+            if (direction.sqrMagnitude < 0.0001f)
+                return;
+
+            Quaternion look = Quaternion.LookRotation(direction);
+            Quaternion quaternion = Quaternion.Euler(0, look.eulerAngles.y, 0);
             transform.rotation = Quaternion.Slerp(transform.rotation, quaternion, 10 * Time.deltaTime);
         }
     }
