@@ -104,6 +104,12 @@ drawn from `RandomNumberGenerator`. The alphabet drops I, O, 0 and 1, because pe
 read these out loud. Public and private rooms carry different prefixes, and
 `OnCreateRoomFailed` retries with a fresh code.
 
+One related thing came out of adding typed room codes afterwards. That retry was
+firing for private joins too, so a private room you could not get into answered by
+creating a fresh public room and putting you in it. You asked for one specific room
+and silently landed somewhere else, with strangers. Private joins now report the
+failure instead, and only matchmaking falls back to creating a room.
+
 ---
 
 ## Also fixed
@@ -221,10 +227,11 @@ under `UNITY_EDITOR` with Unity 2021.2+ defines. Before the fixes the runtime
 assembly produced four errors and the editor assembly five. Both now build with no
 errors and no warnings.
 
-33 assertions cover the room code space and alphabet, display name sanitisation,
-colour clamping, room size clamping, room name prefixes, and the saved-cosmetics
-round trip including comma-containing keys and corrupt input. They compile the real
-files in place, so they always test what is committed:
+64 assertions cover the room code space and alphabet, display name sanitisation,
+colour clamping, room size clamping, room name prefixes, the saved-cosmetics round
+trip including comma-containing keys and corrupt input, typed code normalisation, and
+the leave-then-join handoff for switching rooms. They compile the real files in place,
+so they always test what is committed:
 
 ```
 cd Tests~ && dotnet run --project test.csproj

@@ -219,32 +219,39 @@ namespace Photon.Pun {
    public virtual void OnDisable() {} }
  public class ServerSettings { public Photon.Realtime.AppSettings AppSettings; public string DevRegion; public bool StartInOfflineMode; }
  public class PhotonNetwork {
+   // Stateful for the tests: room membership is settable and every call that
+   // matters is recorded, so the leave-then-join handoff can be asserted.
+   public static readonly System.Collections.Generic.List<string> Calls = new System.Collections.Generic.List<string>();
+   public static bool InRoomFlag = false;
+   public static void Reset() { Calls.Clear(); InRoomFlag = false; CurrentRoomRef = null; }
+
    public static string NickName { get; set; }
    public static bool IsConnected => true;
-   public static bool InRoom => true;
+   public static bool InRoom => InRoomFlag;
    public static bool IsMasterClient => true;
    public static bool AutomaticallySyncScene { get; set; }
    public static Photon.Realtime.AuthenticationValues AuthValues { get; set; }
-   public static ServerSettings PhotonServerSettings => null;
-   public static Photon.Realtime.Player LocalPlayer => null;
-   public static Photon.Realtime.Room CurrentRoom => null;
+   public static ServerSettings PhotonServerSettings { get; set; } = new ServerSettings { AppSettings = new Photon.Realtime.AppSettings() };
+   public static Photon.Realtime.Player LocalPlayer { get; set; } = new Photon.Realtime.Player();
+   public static Photon.Realtime.Room CurrentRoomRef;
+   public static Photon.Realtime.Room CurrentRoom => CurrentRoomRef;
    public static Photon.Realtime.ClientState NetworkClientState => default;
    public static int GetPing() => 0;
    public static void Disconnect() {}
    public static bool ConnectUsingSettings() => true;
    public static bool ConnectUsingSettings(Photon.Realtime.AppSettings a) => true;
-   public static bool CreateRoom(string name) => true;
-   public static bool CreateRoom(string name, Photon.Realtime.RoomOptions o) => true;
-   public static bool CreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l) => true;
-   public static bool CreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l, string[] expectedUsers) => true;
-   public static bool JoinRoom(string name) => true;
-   public static bool JoinOrCreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l) => true;
-   public static bool JoinOrCreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l, string[] expectedUsers) => true;
+   public static bool CreateRoom(string name) => CreateRoom(name, null, null, null);
+   public static bool CreateRoom(string name, Photon.Realtime.RoomOptions o) => CreateRoom(name, o, null, null);
+   public static bool CreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l) => CreateRoom(name, o, l, null);
+   public static bool CreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l, string[] e) { Calls.Add("CreateRoom:" + name); return true; }
+   public static bool JoinRoom(string name) { Calls.Add("JoinRoom:" + name); return true; }
+   public static bool JoinOrCreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l) => JoinOrCreateRoom(name, o, l, null);
+   public static bool JoinOrCreateRoom(string name, Photon.Realtime.RoomOptions o, Photon.Realtime.TypedLobby l, string[] e) { Calls.Add("JoinOrCreateRoom:" + name); return true; }
    public static bool JoinRandomRoom() => true;
    public static bool JoinRandomRoom(ExitGames.Client.Photon.Hashtable f, byte m) => true;
-   public static bool JoinRandomRoom(ExitGames.Client.Photon.Hashtable f, byte m, Photon.Realtime.MatchmakingMode mm, Photon.Realtime.TypedLobby l, string sqlLobbyFilter) => true;
-   public static bool JoinRandomRoom(ExitGames.Client.Photon.Hashtable f, byte m, Photon.Realtime.MatchmakingMode mm, Photon.Realtime.TypedLobby l, string sqlLobbyFilter, string[] expectedUsers) => true;
-   public static bool LeaveRoom() => true;
+   public static bool JoinRandomRoom(ExitGames.Client.Photon.Hashtable f, byte m, Photon.Realtime.MatchmakingMode mm, Photon.Realtime.TypedLobby l, string sql) => true;
+   public static bool JoinRandomRoom(ExitGames.Client.Photon.Hashtable f, byte m, Photon.Realtime.MatchmakingMode mm, Photon.Realtime.TypedLobby l, string sql, string[] e) { Calls.Add("JoinRandomRoom:" + (f != null && f.ContainsKey("queue") ? f["queue"] : "?")); return true; }
+   public static bool LeaveRoom() { Calls.Add("LeaveRoom"); InRoomFlag = false; return true; }
    public static UnityEngine.GameObject Instantiate(string prefabName, UnityEngine.Vector3 pos, UnityEngine.Quaternion rot) => null;
    public static UnityEngine.GameObject Instantiate(string prefabName, UnityEngine.Vector3 pos, UnityEngine.Quaternion rot, byte group) => null;
    public static void Destroy(UnityEngine.GameObject go) {}
@@ -260,4 +267,17 @@ namespace Photon.Voice.Unity {
 }
 namespace Photon.Voice.PUN {
  public class PunVoiceClient : UnityEngine.MonoBehaviour { public static PunVoiceClient Instance => null; }
+}
+
+namespace UnityEngine.Events {
+ public class UnityEventBase { }
+ public class UnityEvent : UnityEventBase { public void Invoke() {} public void AddListener(System.Action a) {} }
+ public class UnityEvent<T0> : UnityEventBase { public void Invoke(T0 a) {} public void AddListener(System.Action<T0> a) {} }
+}
+
+namespace UnityEngine {
+ // Small shim so tests can reset the Photon stub without reaching into Photon.Pun.
+ public static class PhotonNetworkTestAccess {
+   public static void Reset() { Photon.Pun.PhotonNetwork.Reset(); }
+ }
 }
