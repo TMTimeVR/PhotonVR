@@ -150,6 +150,51 @@ int maxPlayers = 8;
 PhotonVRManager.JoinPrivateRoom(roomCode, maxPlayers);
 ```
 
+Codes are cleaned up before use. Case is raised, spaces and punctuation are dropped,
+and anything past 16 characters is cut. So `ab-c 12` and `AB-C12` reach the same
+room, which matters when two people are reading a code to each other. Dashes and
+underscores survive, so a name like `MY-ROOM` works as well as a generated code.
+
+```cs
+PhotonVRManager.NormaliseRoomCode(" ab-c 12 ");  // "AB-C12"
+PhotonVRManager.IsValidRoomCode("!!!");          // false
+```
+
+<b>Calling from a button</b>
+
+The methods above are static, and Unity cannot bind a UnityEvent to a static method
+from the Inspector. So the manager also has three instance methods that take a single
+string, which a button or a UnityEvent can call directly.
+
+```cs
+public void JoinPrivate(string code)
+public void JoinQueue(string queue)
+public void Leave()
+```
+
+Drag the PhotonVRManager object into the event slot, pick one of these, and type the
+code or queue name in the field underneath. Feed `JoinPrivate` from whatever keyboard
+or input field you already have.
+
+<b>Jumping between queues</b>
+
+You can now switch queue while already in a room. PUN refuses a join in that state,
+so the manager leaves the current room first and joins once it is out. Nothing extra
+to call:
+
+```cs
+PhotonVRManager.JoinRandomRoom("Space");
+```
+
+To read your current state:
+
+```cs
+PhotonVRManager.CurrentQueue;    // "Space", or "" in a private room
+PhotonVRManager.InPrivateRoom;   // true or false
+PhotonVRManager.RoomCode;        // the code, without the internal prefix
+PhotonVRManager.LeaveRoom();     // leave without joining anything else
+```
+
 Switching scenes
 ```cs
 int sceneIndex = 1;

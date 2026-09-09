@@ -399,16 +399,8 @@ namespace Photon.VR
                 return;
 
             Manager.State = ConnectionState.Switching_Scenes;
-
-            Manager.pendingQueue = SceneIndex.ToString();
-            Manager.pendingLimit = MaxPlayers;
-
             SceneManager.LoadScene(SceneIndex);
-
-            if (PhotonNetwork.InRoom)
-                PhotonNetwork.LeaveRoom();
-            else
-                JoinRandomRoom(SceneIndex.ToString(), MaxPlayers);
+            JoinRandomRoom(SceneIndex.ToString(), MaxPlayers);
         }
 
         public static void SwitchScenes(int SceneIndex)
@@ -419,20 +411,82 @@ namespace Photon.VR
             SwitchScenes(SceneIndex, Manager.DefaultRoomLimit);
         }
 
-        private string pendingQueue;
+        private enum PendingKind { None, Queue, Private }
+
+        private PendingKind pendingKind = PendingKind.None;
+        private string pendingTarget;
         private int pendingLimit;
+
+        private bool joiningPrivate;
+
+        public static string CurrentQueue
+        {
+            get
+            {
+                if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
+                    return string.Empty;
+
+                ExitGames.Client.Photon.Hashtable props = PhotonNetwork.CurrentRoom.CustomProperties;
+                if (props == null || !props.TryGetValue("queue", out object q))
+                    return string.Empty;
+
+                return q as string ?? string.Empty;
+            }
+        }
+
+        public static bool InPrivateRoom
+        {
+            get
+            {
+                if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
+                    return false;
+
+                string name = PhotonNetwork.CurrentRoom.Name;
+                return name != null && name.StartsWith(PrivateRoomPrefix);
+            }
+        }
+
+        public static void LeaveRoom()
+        {
+            if (!ManagerReady())
+                return;
+
+            Manager.pendingKind = PendingKind.None;
+            Manager.pendingTarget = null;
+
+            if (PhotonNetwork.InRoom)
+                PhotonNetwork.LeaveRoom();
+        }
+
+        private static bool DeferUntilOutOfRoom(PendingKind kind, string target, int maxPlayers)
+        {
+            if (!PhotonNetwork.InRoom)
+                return false;
+
+            Manager.pendingKind = kind;
+            Manager.pendingTarget = target;
+            Manager.pendingLimit = maxPlayers;
+            PhotonNetwork.LeaveRoom();
+            return true;
+        }
 
         public override void OnLeftRoom()
         {
             State = ConnectionState.Connected;
 
-            if (!string.IsNullOrEmpty(pendingQueue))
-            {
-                string queue = pendingQueue;
-                int limit = pendingLimit;
-                pendingQueue = null;
-                JoinRandomRoom(queue, limit);
-            }
+            if (pendingKind == PendingKind.None)
+                return;
+
+            PendingKind kind = pendingKind;
+            string target = pendingTarget;
+            int limit = pendingLimit;
+            pendingKind = PendingKind.None;
+            pendingTarget = null;
+
+            if (kind == PendingKind.Queue)
+                JoinRandomRoom(target, limit);
+            else
+                JoinPrivateRoom(target, limit);
         }
 
         public static void JoinRandomRoom(string Queue, int MaxPlayers) => _JoinRandomRoom(Queue, MaxPlayers);
@@ -444,7 +498,18 @@ namespace Photon.VR
             if (!ManagerReady())
                 return;
 
+            if (string.IsNullOrEmpty(Queue))
+            {
+                Debug.LogError("A queue needs a name");
+                return;
+            }
+
+            if (DeferUntilOutOfRoom(PendingKind.Queue, Queue, MaxPlayers))
+                return;
+
+            Manager.joiningPrivate = false;
             Manager.State = ConnectionState.JoiningRoom;
+
             ExitGames.Client.Photon.Hashtable hastable = new ExitGames.Client.Photon.Hashtable();
             hastable.Add("queue", Queue);
             hastable.Add("version", Application.version);
@@ -453,7 +518,7 @@ namespace Photon.VR
             Manager.options = roomOptions;
 
             PhotonNetwork.JoinRandomRoom(hastable, roomOptions.MaxPlayers, MatchmakingMode.RandomMatching, null, null, null);
-            Debug.Log($"Joining random with type {hastable["queue"]}");
+            Status($"Joining {Queue}");
         }
 
         private static RoomOptions BuildRoomOptions(int MaxPlayers, bool visible, ExitGames.Client.Photon.Hashtable properties)
@@ -473,31 +538,92 @@ namespace Photon.VR
             return roomOptions;
         }
 
+        public const int MaxTypedRoomCodeLength = 16;
+
+        public static string NormaliseRoomCode(string code)
+        {
+            if (string.IsNullOrEmpty(code))
+                return string.Empty;
+
+            System.Text.StringBuilder clean = new System.Text.StringBuilder(code.Length);
+            foreach (char c in code)
+            {
+                if (clean.Length >= MaxTypedRoomCodeLength)
+                    break;
+
+                if (char.IsLetterOrDigit(c))
+                    clean.Append(char.ToUpperInvariant(c));
+                else if (c == '-' || c == '_')
+                    clean.Append(c);
+            }
+
+            return clean.ToString();
+        }
+
+        public static bool IsValidRoomCode(string code)
+        {
+            return NormaliseRoomCode(code).Length > 0;
+        }
+
         public static void JoinPrivateRoom(string RoomId, int MaxPlayers) => _JoinPrivateRoom(RoomId, MaxPlayers);
 
         public static void JoinPrivateRoom(string RoomId) => _JoinPrivateRoom(RoomId, Manager != null ? Manager.DefaultRoomLimit : 10);
+
+        public void JoinPrivate(string code) => JoinPrivateRoom(code);
+
+        public void JoinQueue(string queue) => JoinRandomRoom(queue);
+
+        public void Leave() => LeaveRoom();
 
         public static void _JoinPrivateRoom(string RoomId, int MaxPlayers)
         {
             if (!ManagerReady())
                 return;
 
-            if (string.IsNullOrEmpty(RoomId))
+            string code = NormaliseRoomCode(RoomId);
+            if (code.Length == 0)
             {
                 Debug.LogError("A private room needs a room code");
+                Status("That room code is not usable.");
                 return;
             }
 
-            PhotonNetwork.JoinOrCreateRoom(PrivateRoomPrefix + RoomId,
-                BuildRoomOptions(MaxPlayers, false, null), null, null);
-            Status($"Joining a private room: {RoomId}");
+            if (DeferUntilOutOfRoom(PendingKind.Private, code, MaxPlayers))
+                return;
+
+            Manager.joiningPrivate = true;
             Manager.State = ConnectionState.JoiningRoom;
+
+            PhotonNetwork.JoinOrCreateRoom(PrivateRoomPrefix + code,
+                BuildRoomOptions(MaxPlayers, false, null), null, null);
+            Status($"Joining a private room: {code}");
         }
 
         public override void OnJoinedRoom()
         {
-            Debug.Log("Joined a room");
+            joiningPrivate = false;
             State = ConnectionState.InRoom;
+
+            if (InPrivateRoom)
+                Status($"In private room {RoomCode}");
+            else
+                Status($"In queue {CurrentQueue}");
+        }
+
+        public static string RoomCode
+        {
+            get
+            {
+                if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
+                    return string.Empty;
+
+                string name = PhotonNetwork.CurrentRoom.Name ?? string.Empty;
+                if (name.StartsWith(PrivateRoomPrefix))
+                    return name.Substring(PrivateRoomPrefix.Length);
+                if (name.StartsWith(PublicRoomPrefix))
+                    return name.Substring(PublicRoomPrefix.Length);
+                return name;
+            }
         }
 
         public override void OnDisconnected(DisconnectCause cause)
@@ -511,8 +637,26 @@ namespace Photon.VR
 
         public override void OnCreateRoomFailed(short returnCode, string message)
         {
+
+            if (joiningPrivate)
+            {
+                joiningPrivate = false;
+                State = ConnectionState.Error;
+                Debug.LogWarning($"Could not join that private room ({returnCode}: {message})");
+                Status("Could not join that room.");
+                return;
+            }
+
             Debug.LogWarning($"Room creation failed ({returnCode}: {message}), retrying with a new code");
             HandleJoinError();
+        }
+
+        public override void OnJoinRoomFailed(short returnCode, string message)
+        {
+            joiningPrivate = false;
+            State = ConnectionState.Error;
+            Debug.LogWarning($"Could not join that room ({returnCode}: {message})");
+            Status("Could not join that room.");
         }
 
         private void HandleJoinError()

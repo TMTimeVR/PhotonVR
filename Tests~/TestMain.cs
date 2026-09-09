@@ -68,7 +68,12 @@ public static class TestMain
 
             Check("ORIGINAL 1e5 code space collides over 2000 draws", () => legacyDupes > 0,
                   "dupes=" + legacyDupes);
-            Check("new code space does not", () => modernDupes == 0, "dupes=" + modernDupes);
+            // Not "zero collisions": over 2000 draws from 1.07e9 the expectation is
+            // about 0.002, so demanding zero would flake roughly once in 500 runs.
+            // The claim being made is that the space is far larger, so test that.
+            Check("new code space collides at least 10x less often",
+                  () => modernDupes * 10 < legacyDupes,
+                  "new=" + modernDupes + " vs original=" + legacyDupes);
         }
 
         Console.WriteLine("\n== 2. Display names cannot carry TMP rich text or unbounded length ==");
@@ -159,6 +164,159 @@ public static class TestMain
             Check("neither prefix is empty", () => pub.Length > 0 && priv.Length > 0);
             Check("a private code cannot name a public room",
                   () => !(priv + "ABC123").StartsWith(pub));
+        }
+
+        Console.WriteLine("\n== 7. Typed room codes are normalised before use ==");
+        {
+            Func<string, string> N = PhotonVRManager.NormaliseRoomCode;
+
+            Check("lower case is raised", () => N("abc123") == "ABC123", N("abc123"));
+            Check("spaces from a VR keyboard are dropped", () => N(" A B C ") == "ABC", N(" A B C "));
+            Check("punctuation is dropped", () => N("AB!C@1#2") == "ABC12", N("AB!C@1#2"));
+            Check("dash and underscore survive", () => N("MY-ROOM_2") == "MY-ROOM_2", N("MY-ROOM_2"));
+            Check("a custom name still works", () => N("MyRoom") == "MYROOM", N("MyRoom"));
+            Check("length is capped at 16", () => N(new string('A', 100)).Length == 16);
+            Check("null is safe", () => N(null) == "");
+            Check("punctuation only is rejected", () => !PhotonVRManager.IsValidRoomCode("!!! ???"));
+            Check("empty is rejected", () => !PhotonVRManager.IsValidRoomCode(""));
+            Check("a real code is accepted", () => PhotonVRManager.IsValidRoomCode("abc123"));
+
+            // Two people typing the same code differently must land in one room.
+            Check("differing keyboard input converges on one room name",
+                  () => N("ab-c 12") == N("AB-C12"), N("ab-c 12") + " vs " + N("AB-C12"));
+        }
+
+        Console.WriteLine("\n== 8. Switching rooms leaves the old one first ==");
+        {
+            // PUN refuses a join while still in a room, so both features depend on
+            // this handoff: leave, wait for OnLeftRoom, then join.
+            Func<PhotonVRManager> fresh = () =>
+            {
+                UnityEngine.PhotonNetworkTestAccess.Reset();
+                var m = new PhotonVRManager();
+                typeof(PhotonVRManager).GetProperty("Manager", BindingFlags.Public | BindingFlags.Static)
+                    .SetValue(null, m);
+                return m;
+            };
+
+            // Queue jump while already in a room.
+            var mgr = fresh();
+            Photon.Pun.PhotonNetwork.InRoomFlag = true;
+            PhotonVRManager.JoinRandomRoom("Space", 8);
+            var calls = Photon.Pun.PhotonNetwork.Calls;
+            Check("queue jump leaves the current room first",
+                  () => calls.Contains("LeaveRoom"), string.Join(" | ", calls));
+            Check("queue jump does not join while still in a room",
+                  () => !calls.Exists(c => c.StartsWith("JoinRandomRoom")), string.Join(" | ", calls));
+
+            mgr.OnLeftRoom();
+            Check("the queue join runs once PUN reports we are out",
+                  () => calls.Exists(c => c == "JoinRandomRoom:Space"), string.Join(" | ", calls));
+
+            // Private join while already in a room.
+            var mgr2 = fresh();
+            Photon.Pun.PhotonNetwork.InRoomFlag = true;
+            PhotonVRManager.JoinPrivateRoom("abc123", 8);
+            var calls2 = Photon.Pun.PhotonNetwork.Calls;
+            Check("private join leaves the current room first",
+                  () => calls2.Contains("LeaveRoom"), string.Join(" | ", calls2));
+            Check("private join does not join while still in a room",
+                  () => !calls2.Exists(c => c.StartsWith("JoinOrCreateRoom")), string.Join(" | ", calls2));
+
+            mgr2.OnLeftRoom();
+            Check("the private join runs afterwards, normalised and prefixed",
+                  () => calls2.Exists(c => c == "JoinOrCreateRoom:priv-ABC123"), string.Join(" | ", calls2));
+
+            // Not in a room: join immediately, no leave.
+            var mgr3 = fresh();
+            Photon.Pun.PhotonNetwork.InRoomFlag = false;
+            PhotonVRManager.JoinRandomRoom("Lava", 8);
+            var calls3 = Photon.Pun.PhotonNetwork.Calls;
+            Check("joining from outside a room does not call LeaveRoom",
+                  () => !calls3.Contains("LeaveRoom"), string.Join(" | ", calls3));
+            Check("joining from outside a room joins straight away",
+                  () => calls3.Exists(c => c == "JoinRandomRoom:Lava"), string.Join(" | ", calls3));
+
+            // OnLeftRoom with nothing pending must not join anything.
+            var mgr4 = fresh();
+            mgr4.OnLeftRoom();
+            Check("leaving with nothing pending joins nothing",
+                  () => Photon.Pun.PhotonNetwork.Calls.Count == 0,
+                  string.Join(" | ", Photon.Pun.PhotonNetwork.Calls));
+
+            // LeaveRoom() must cancel a pending join rather than firing it later.
+            var mgr5 = fresh();
+            Photon.Pun.PhotonNetwork.InRoomFlag = true;
+            PhotonVRManager.JoinRandomRoom("Space", 8);
+            PhotonVRManager.LeaveRoom();
+            mgr5.OnLeftRoom();
+            Check("an explicit LeaveRoom cancels the pending join",
+                  () => !Photon.Pun.PhotonNetwork.Calls.Exists(c => c.StartsWith("JoinRandomRoom")),
+                  string.Join(" | ", Photon.Pun.PhotonNetwork.Calls));
+        }
+
+        Console.WriteLine("\n== 9. A failed private join does not dump you in a public room ==");
+        {
+            UnityEngine.PhotonNetworkTestAccess.Reset();
+            var m = new PhotonVRManager();
+            typeof(PhotonVRManager).GetProperty("Manager", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, m);
+
+            Photon.Pun.PhotonNetwork.InRoomFlag = false;
+            PhotonVRManager.JoinPrivateRoom("FRIENDS", 8);
+            Photon.Pun.PhotonNetwork.Calls.Clear();
+
+            m.OnCreateRoomFailed(32766, "room full");
+            Check("no public room is created behind the player's back",
+                  () => !Photon.Pun.PhotonNetwork.Calls.Exists(c => c.StartsWith("CreateRoom")),
+                  string.Join(" | ", Photon.Pun.PhotonNetwork.Calls));
+            Check("state reports the error", () => PhotonVRManager.GetConnectionState() == ConnectionState.Error);
+
+            // A failed *random* join should still fall back to creating a room.
+            UnityEngine.PhotonNetworkTestAccess.Reset();
+            PhotonVRManager.JoinRandomRoom("Space", 8);
+            Photon.Pun.PhotonNetwork.Calls.Clear();
+            m.OnJoinRandomFailed(32760, "no match found");
+            Check("a failed matchmake still creates a public room",
+                  () => Photon.Pun.PhotonNetwork.Calls.Exists(c => c.StartsWith("CreateRoom:pub-")),
+                  string.Join(" | ", Photon.Pun.PhotonNetwork.Calls));
+        }
+
+        Console.WriteLine("\n== 10. The UnityEvent-friendly wrappers ==");
+        {
+            // These have to be instance methods. Unity cannot bind a UnityEvent in
+            // the Inspector to a static one, which is the only reason they exist
+            // alongside the static API.
+            foreach (string name in new[] { "JoinPrivate", "JoinQueue", "Leave" })
+            {
+                MethodInfo m = typeof(PhotonVRManager).GetMethod(name,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
+                Check($"{name} exists and is an instance method",
+                      () => m != null && !m.IsStatic && m.IsPublic,
+                      m == null ? "missing" : (m.IsStatic ? "static, so the Inspector cannot bind it" : "ok"));
+            }
+
+            MethodInfo jp = typeof(PhotonVRManager).GetMethod("JoinPrivate");
+            MethodInfo jq = typeof(PhotonVRManager).GetMethod("JoinQueue");
+            Check("JoinPrivate takes one string", () => jp.GetParameters().Length == 1 && jp.GetParameters()[0].ParameterType == typeof(string));
+            Check("JoinQueue takes one string", () => jq.GetParameters().Length == 1 && jq.GetParameters()[0].ParameterType == typeof(string));
+
+            // And they do the same thing as the static calls.
+            UnityEngine.PhotonNetworkTestAccess.Reset();
+            var m2 = new PhotonVRManager();
+            typeof(PhotonVRManager).GetProperty("Manager", BindingFlags.Public | BindingFlags.Static).SetValue(null, m2);
+
+            Photon.Pun.PhotonNetwork.InRoomFlag = false;
+            m2.JoinPrivate("abc 123");
+            Check("JoinPrivate normalises and joins",
+                  () => Photon.Pun.PhotonNetwork.Calls.Exists(c => c == "JoinOrCreateRoom:priv-ABC123"),
+                  string.Join(" | ", Photon.Pun.PhotonNetwork.Calls));
+
+            UnityEngine.PhotonNetworkTestAccess.Reset();
+            m2.JoinQueue("Space");
+            Check("JoinQueue joins the queue",
+                  () => Photon.Pun.PhotonNetwork.Calls.Exists(c => c == "JoinRandomRoom:Space"),
+                  string.Join(" | ", Photon.Pun.PhotonNetwork.Calls));
         }
 
         Console.WriteLine("\n----------------------------------------");
