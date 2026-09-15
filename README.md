@@ -17,6 +17,13 @@ fixed. So are two bugs that let any player in a room crash everyone else, and ro
 codes that collided often enough to leave people stuck. Full write-up in
 [reports/security-review.md](reports/security-review.md), tests in [Tests~](Tests~).
 
+### DISCLAIMER:
+
+**Yes, AI (Claude) was used in this system. Claude was used as a second pair of eyes, not just something that generates code that I instantly put into this system.**
+This is (probably) a safe and secure backend. I dunno, don't take my word on it. This is an older version of the backend in [Monkey Mall](https://www.meta.com/en-gb/experiences/chimpstitute/6878051502218331/).
+
+This isn't enterprise-ready. Use this for your hobby project, or to just inspire yourself.
+
 
 # I DID NOT MAKE THIS. I JUST MODIFIED THE CODE!
 
